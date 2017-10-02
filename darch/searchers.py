@@ -11,7 +11,7 @@ def evaluate_and_print(evaluator, model,
 
     if output_to_terminal:
         pprint( model.repr_model() , width=40, indent=2)
-        print 
+        print()
         
     if ignore_invalid_models:
         try: 
@@ -19,7 +19,7 @@ def evaluate_and_print(evaluator, model,
 
         except ValueError:
             if output_to_terminal:
-                print "Invalid Model!"
+                print("Invalid Model!")
                 return None
     else:
         sc = evaluator.eval_model(model)   
@@ -51,7 +51,7 @@ class EnumerationSearcher:
             name, vals = b.get_choices()
 
             # recurse on the enumeration for each of the possible choices.
-            for choice_i in xrange(len(vals)):
+            for choice_i in range(len(vals)):
                 bi = copy.deepcopy(b)
                 bi.choose(choice_i)
                 for (bk, choice_histk) in self._enumerate_models_iter(
@@ -94,7 +94,7 @@ class RandomSearcher:
 
         samples = []
         choice_hists = []
-        for _ in xrange(nsamples):
+        for _ in range(nsamples):
             bk = copy.deepcopy(b)
             bk.initialize(self.in_d, Scope())
             hist = []
@@ -161,8 +161,8 @@ class SMBOLinearSearcher:
             # filtering out empty modules in the sequence
             bls = [b[0] for b in tuple(b.repr_model()) if b[0] != "Empty"]
 
-            for k in xrange(1, maxlen):
-                for i in xrange(len(bls) - k):
+            for k in range(1, maxlen):
+                for i in range(len(bls) - k):
                     ngram = tuple(bls[i:i + k])
 
                     if ngram not in ngram_to_count:
@@ -191,8 +191,8 @@ class SMBOLinearSearcher:
         feats[0, 0] = len(bls)
 
         # ngrams features
-        for k in xrange(1, self.ngram_maxlen):
-            for i in xrange(len(bls) - k):
+        for k in range(1, self.ngram_maxlen):
+            for i in range(len(bls) - k):
                 ngram = tuple(bls[i:i + k])
 
                 if ngram in self.module_ngram_to_id:
@@ -232,7 +232,7 @@ class SMBOLinearSearcher:
         scores = []
         choice_hists = []
 
-        for _ in xrange(nsamples):
+        for _ in range(nsamples):
             bk = copy.deepcopy(self.b_search)
             bk.initialize(self.in_d, Scope())
             hist = []
@@ -327,7 +327,7 @@ def run_smbo_searcher(evaluator, searcher,
     num_evals = 0
     ep_model_inds = []
     ep_true_scores = []
-    for i in xrange(len(models)):
+    for i in range(len(models)):
         mdl = models[i]
         hist = choice_hists[i]
         maybe_register_choice_hist(mdl, hist, save_hist_in_model)
@@ -347,7 +347,7 @@ def run_smbo_searcher(evaluator, searcher,
     # compute the string representations from which the features are going to
     # be derived.
     evaluated_models = {b.repr_model() for b in models}
-    for i in xrange(nsamples_after):
+    for i in range(nsamples_after):
         if i % refit_interval == 0:
             searcher.refit_model()
 
@@ -406,7 +406,7 @@ class MCTSearcher:
         models = []
         choice_hists = []
 
-        for _ in xrange(num_samples):
+        for _ in range(num_samples):
             # initialization of the model.
             bk = copy.deepcopy(self.b_search)
             bk.initialize(self.in_d, Scope())
@@ -516,7 +516,7 @@ class MCTSTreeNode:
 
     # expands a node creating all the placeholders for the children.
     def expand(self, num_children):
-        self.children = [MCTSTreeNode(self) for _ in xrange(num_children)]
+        self.children = [MCTSTreeNode(self) for _ in range(num_children)]
 
 # NOTE: if the search space has holes, it break. needs try/except module.
 def run_mcts_searcher(evaluator, searcher, num_models,
@@ -526,7 +526,7 @@ def run_mcts_searcher(evaluator, searcher, num_models,
     srch_choice_hists = []
     srch_scores = []
 
-    for _ in xrange(num_models):
+    for _ in range(num_models):
         (models, hists) = searcher.sample_models(1)
         mdl = models[0]
         # has to join the tree and rollout histories to make a normal history.

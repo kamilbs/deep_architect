@@ -1,5 +1,5 @@
 
-import base 
+from . import base 
 import numpy as np
 import tensorflow as tf
 import copy
@@ -540,7 +540,7 @@ class Repeat:
             k = self.domains[0][choice_i]
 
             self.b_index = 0
-            self.active_bs = [copy.deepcopy(self.b) for _ in xrange(k)] 
+            self.active_bs = [copy.deepcopy(self.b) for _ in range(k)] 
             self.active_bs[0].initialize(self.in_d, self.scope) 
         else:
             self.active_bs[self.b_index].choose(choice_i)
@@ -616,7 +616,7 @@ class RepeatTied:
             k = self.domains[0][choice_i]
 
             self.b_index = 0
-            self.active_bs = [copy.deepcopy(self.b) for _ in xrange(k)] 
+            self.active_bs = [copy.deepcopy(self.b) for _ in range(k)] 
             self.active_bs[0].initialize(self.in_d, self.scope) 
         else:
             self.active_bs[self.b_index].choose(choice_i)

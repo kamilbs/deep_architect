@@ -128,11 +128,11 @@ class ClassifierEvaluator:
             val_num_examples = self.val_dataset.get_num_examples()
 
             # Training cycle
-            for epoch in xrange(self.training_epochs):
+            for epoch in range(self.training_epochs):
                 avg_cost = 0.
                 total_batch = int(train_num_examples / batch_size)
                 # Loop over all batches
-                for i in xrange(total_batch):
+                for i in range(total_batch):
                     batch_x, batch_y = self.train_dataset.next_batch(batch_size)
                     #print((batch_x.shape, batch_y.shape))
                     #import ipdb; ipdb.set_trace()
