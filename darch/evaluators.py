@@ -15,13 +15,13 @@ class ClassifierEvaluator:
 
     """
 
-    def __init__(self, train_dataset, val_dataset, in_d, nclasses, model_path, 
+    def __init__(self, train_dataset, val_dataset, in_d, nclasses, model_path,
             training_epochs_max=200, time_minutes_max=180.0, 
             stop_patience=20, rate_patience=7, batch_patience=np.inf, 
             save_patience=2, rate_mult=0.5, batch_mult=2, 
             optimizer_type='adam', sgd_momentum=0.99,
             learning_rate_init=1e-3, learning_rate_min=1e-6, batch_size_init=32, 
-            display_step=1, output_to_terminal=False, test_dataset=None):
+            display_step=1, output_to_terminal=False, test_dataset=None, in_dtype=tf.float32):
 
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
@@ -45,6 +45,7 @@ class ClassifierEvaluator:
         self.sgd_momentum = sgd_momentum
         self.model_path = model_path
         self.test_dataset = test_dataset
+        self.in_dtype = in_dtype
         
         if not os.path.exists(os.path.dirname(model_path)):
             try:
@@ -56,7 +57,7 @@ class ClassifierEvaluator:
     def eval_model(self, b):
         tf.reset_default_graph()
 
-        x = tf.placeholder("float", [None] + self.in_d)
+        x = tf.placeholder(shape=[None] + self.in_d, dtype=self.in_dtype)
         y = tf.placeholder("float", [None, self.nclasses])
 
         learning_rate = tf.placeholder("float")
