@@ -170,9 +170,9 @@ def onehot_to_idx(y_onehot):
     return y_idx
 
 def idx_to_onehot(y_idx, num_classes):
-    num_images = y.shape[0]
+    num_images = y_idx.shape[0]
     y_one_hot = np.zeros( (num_images, num_classes), dtype='float32')
-    y_one_hot[ np.arange(num_images),  y ] = 1.0
+    y_one_hot[ np.arange(num_images),  y_idx ] = 1.0
 
     return y_one_hot
 
