@@ -30,7 +30,6 @@ class BasicModule(object):
     def initialize(self, in_d, scope):
         if self.in_d != None or self.scope != None:
             raise AssertionError
-        #print(in_d)
         if len(in_d) < 1:
             raise ValueError
 
@@ -193,29 +192,39 @@ class Affine(BasicModule):
 
 # computes the output dimension based on the padding scheme used.
 # this comes from the tensorflow documentation
-def compute_padded_dims(in_height, in_width, window_len, stride, padding):
+def compute_padded_dims(in_height, in_width, window_len, stride, padding, window_width=None, stride_width=None):
+
+    if not window_width:
+        window_width = window_len
+    if not stride_width:
+        stride_width = stride
 
     if padding == "SAME":
         out_height = int(np.ceil(float(in_height) / float(stride)))
-        out_width  = int(np.ceil(float(in_width) / float(stride)))
+        out_width  = int(np.ceil(float(in_width) / float(stride_width)))
     elif padding == "VALID":
         out_height = int(np.ceil(float(in_height - window_len + 1) / float(stride)))
-        out_width  = int(np.ceil(float(in_width - window_len + 1) / float(stride)))
+        out_width = int(np.ceil(float(in_width - window_width + 1) / float(stride_width)))
     else:
         raise ValueError
 
     return (out_height, out_width)
 
+
 class MaxPooling2D(BasicModule):
-    def __init__(self, window_lens, strides, paddings):
+    def __init__(self, window_lens, strides, paddings, use_full_dim_width=False):
         super(MaxPooling2D, self).__init__()
 
         self.order.extend(["window_len", "stride", "padding"])
         self.domains.extend([window_lens, strides, paddings])
+        self.use_full_dim_width = use_full_dim_width
+
 
     # does additional error checking on the dimension.
     def initialize(self, in_d, scope):
         if len(in_d) != 3:
+            raise ValueError
+        elif self.use_full_dim_width and self.domains[2] != ['VALID']:
             raise ValueError
         else:
             super(MaxPooling2D, self).initialize(in_d, scope)
@@ -225,10 +234,15 @@ class MaxPooling2D(BasicModule):
         window_len, stride, padding = [dom[i] 
                 for (dom, i) in zip(self.domains, self.chosen)]
 
-        out_height, out_width = compute_padded_dims(
-            in_height, in_width, window_len, stride, padding)
-        out_d = (out_height, out_width, in_nchannels)
+        if self.use_full_dim_width:
+            out_height, out_width = compute_padded_dims(
+                    in_height, in_width, window_len, stride, padding,
+                    window_width=in_width, stride_width=1)
+        else:
+            out_height, out_width = compute_padded_dims(
+                in_height, in_width, window_len, stride, padding)
 
+        out_d = (out_height, out_width, in_nchannels)
         return out_d
             
     def compile(self, in_x, train_feed, eval_feed):
@@ -236,9 +250,17 @@ class MaxPooling2D(BasicModule):
         window_len, stride, padding = [dom[i] 
                 for (dom, i) in zip(self.domains, self.chosen)]
 
-        out_y = tf.nn.max_pool( 
-            in_x, ksize=[1, window_len, window_len, 1], 
-            strides=[1, stride, stride, 1], padding=padding)
+        if self.use_full_dim_width:
+            window_width = in_width
+            stride_for_width = 1
+        else:
+            window_width = window_len
+            stride_for_width = stride
+
+        out_y = tf.nn.max_pool(
+            in_x, ksize=[1, window_len, window_width, 1],
+            strides=[1, stride, stride_for_width, 1], padding=padding)
+        print(out_y)
 
         return out_y
 
@@ -246,15 +268,21 @@ class MaxPooling2D(BasicModule):
 # this may change later if we can capture most of the pooling layers in the 
 # same format. for now, an auxiliary function is provided.
 class AvgPooling2D(BasicModule):
-    def __init__(self, window_lens, strides, paddings):
+    def __init__(self, window_lens, strides, paddings, use_full_dim_width=False):
         super(AvgPooling2D, self).__init__()
 
         self.order.extend(["window_len", "stride", "padding"])
         self.domains.extend([window_lens, strides, paddings])
 
+        self.use_full_dim_width = use_full_dim_width
+
+
+
     # does additional error checking on the dimension.
     def initialize(self, in_d, scope):
         if len(in_d) != 3:
+            raise ValueError
+        elif self.use_full_dim_width and self.domains[2] != ['VALID']:
             raise ValueError
         else:
             super(AvgPooling2D, self).initialize(in_d, scope)
@@ -264,8 +292,14 @@ class AvgPooling2D(BasicModule):
         window_len, stride, padding = [dom[i] 
                 for (dom, i) in zip(self.domains, self.chosen)]
 
-        out_height, out_width = compute_padded_dims(
-            in_height, in_width, window_len, stride, padding)
+        if self.use_full_dim_width:
+            out_height, out_width = compute_padded_dims(
+                    in_height, in_width, window_len, stride, padding,
+                    window_width=in_width, stride_width=1)
+        else:
+            out_height, out_width = compute_padded_dims(
+                in_height, in_width, window_len, stride, padding)
+
         out_d = (out_height, out_width, in_nchannels)
 
         return out_d
@@ -275,16 +309,24 @@ class AvgPooling2D(BasicModule):
         window_len, stride, padding = [dom[i] 
                 for (dom, i) in zip(self.domains, self.chosen)]
 
+        if self.use_full_dim_width:
+            window_width = in_width
+            stride_for_width = 1
+        else:
+            window_width = window_len
+            stride_for_width = stride
+
         out_y = tf.nn.avg_pool( 
-            in_x, ksize=[1, window_len, window_len, 1], 
-            strides=[1, stride, stride, 1], padding=padding)
+            in_x, ksize=[1, window_len, window_width, 1],
+            strides=[1, stride, stride_for_width, 1], padding=padding)
 
         return out_y
+
 
 class Conv2D(BasicModule):
 
     def __init__(self, filter_numbers, filter_lens, strides, paddings, 
-            param_init_fns):
+            param_init_fns, use_full_dim_width=False):
         super(Conv2D, self).__init__()
 
         self.order.extend(["filter_number", "filter_len", "stride", "padding",
@@ -292,21 +334,33 @@ class Conv2D(BasicModule):
         self.domains.extend([filter_numbers, filter_lens, strides, paddings, 
             param_init_fns])
 
+        # If true : put the width of the filter to the dimension of the input (useful for text input)
+        self.use_full_dim_width = use_full_dim_width
+
+
     # does additional error checking on the dimension.
     def initialize(self, in_d, scope):
-        #print(in_d)
         if len(in_d) != 3:
-            raise ValueError
+            raise ValueError('in_d is '+str(in_d)+' but expecting 3')
+        elif self.use_full_dim_width and self.domains[3] != ['VALID']:
+            raise ValueError('Must use VALID padding when using use_full_dim_width')
         else:
             super(Conv2D, self).initialize(in_d, scope)
+
 
     def get_outdim(self):
         in_height, in_width, in_nchannels = self.in_d 
         nfilters, filter_len, stride, padding, _ = [dom[i] 
                 for (dom, i) in zip(self.domains, self.chosen)]
 
-        out_height, out_width = compute_padded_dims(
-                in_height, in_width, filter_len, stride, padding)
+        if self.use_full_dim_width:
+            out_height, out_width = compute_padded_dims(
+                    in_height, in_width, filter_len, stride, padding,
+                    window_width=in_width, stride_width=1)
+        else:
+            out_height, out_width = compute_padded_dims(
+                in_height, in_width, filter_len, stride, padding) #window_width and stride_width defined as the same as height
+
         out_d = (out_height, out_width, nfilters)
 
         return out_d
@@ -318,13 +372,23 @@ class Conv2D(BasicModule):
 
         # Creation and initialization of the parameters. Should take size of 
         # the filter into account.
+
+        if self.use_full_dim_width:
+            filter_width = in_width
+            stride_width = 1
+        else:
+            filter_width = filter_len
+            stride_width = stride
+
         W = tf.Variable(
-                param_init_fn( [filter_len, filter_len, in_nchannels, nfilters]) )
+                param_init_fn( [filter_len, filter_width, in_nchannels, nfilters]) )
         b = tf.Variable(tf.zeros([nfilters]))
 
         # create the output and add the bias.
-        out_yaux = tf.nn.conv2d(in_x, W, strides=[1, stride, stride, 1], padding=padding)
+
+        out_yaux = tf.nn.conv2d(in_x, W, strides=[1, stride, stride_width, 1], padding=padding)
         out_y = tf.nn.bias_add(out_yaux, b)
+        print(out_y)
 
         #print(in_x.get_shape(), self.get_outdim(), out_y.get_shape())
 
