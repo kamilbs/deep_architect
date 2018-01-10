@@ -3,23 +3,23 @@ import numpy as np
 import scipy.sparse as sp
 import sklearn.linear_model as lm
 from pprint import pprint
+from pprint import pformat
 from darch.base import *
 import copy
+import logging
 
 def evaluate_and_print(evaluator, model,
-        output_to_terminal, ignore_invalid_models):
+         ignore_invalid_models):
 
-    if output_to_terminal:
-        pprint( model.repr_model() , width=40, indent=2)
-        print()
+    log_str = pformat(model.repr_model() , width=40, indent=2)
+    logging.info(log_str)
         
     if ignore_invalid_models:
         try: 
             sc = evaluator.eval_model(model)
 
         except ValueError:
-            if output_to_terminal:
-                print("Invalid Model!")
+                logging.info("Invalid Model!")
                 return None
     else:
         sc = evaluator.eval_model(model)   
@@ -39,6 +39,7 @@ def walk_hist(b, hist):
     """
     for ch_i in hist:
         b.choose(ch_i)
+
 
 class EnumerationSearcher:
     def __init__(self, b_search, in_d):
@@ -69,15 +70,15 @@ class EnumerationSearcher:
             yield (bk, choice_histk)
 
 def run_enumeration_searcher(evaluator, searcher,
-        output_to_terminal=False, ignore_invalid_models=False,
+         ignore_invalid_models=False,
         save_hist_in_model=False):
 
     scores = []
     hists = []
     for (mdl, h) in searcher.enumerate_models():
 
-        sc = evaluate_and_print(evaluator, model, 
-                output_to_terminal, ignore_invalid_models)
+        sc = evaluate_and_print(evaluator, mdl,
+                 ignore_invalid_models)
         if sc != None:
             scores.append(sc)
             hists.append(h)
@@ -113,7 +114,7 @@ class RandomSearcher:
         return (samples, choice_hists)
 
 def run_random_searcher(evaluator, searcher, num_models, 
-        output_to_terminal=False, ignore_invalid_models=False,
+        ignore_invalid_models=False,
         save_hist_in_model=False):
 
     srch_choice_hists = []
@@ -127,7 +128,7 @@ def run_random_searcher(evaluator, searcher, num_models,
         maybe_register_choice_hist(mdl, hist, save_hist_in_model)
 
         sc = evaluate_and_print(evaluator, mdl, 
-                output_to_terminal, ignore_invalid_models)
+                 ignore_invalid_models)
         if sc != None:
             srch_choice_hists.append(hist)
             srch_scores.append(sc)
@@ -317,7 +318,7 @@ class SMBOLinearSearcher:
 # NOTE: if the search space has holes, it break. needs try/except module.
 def run_smbo_searcher(evaluator, searcher,
         nsamples_start, nsamples_after, nsamples_epoch, refit_interval, explore_prob,
-        output_to_terminal=False, ignore_invalid_models=False,
+        ignore_invalid_models=False,
         save_hist_in_model=False):
 
     # initially, just sample a few models and evaluate them all.
@@ -334,7 +335,7 @@ def run_smbo_searcher(evaluator, searcher,
 
         #sc = evaluator.eval_model(mdl)
         sc = evaluate_and_print(evaluator, mdl, 
-                output_to_terminal, ignore_invalid_models)
+                 ignore_invalid_models)
         if sc != None:
             ep_model_inds.append(i)
             ep_true_scores.append(sc)
@@ -367,7 +368,7 @@ def run_smbo_searcher(evaluator, searcher,
 
             #sc = evaluator.eval_model(mdl)
             sc = evaluate_and_print(evaluator, mdl, 
-                    output_to_terminal, ignore_invalid_models)
+                     ignore_invalid_models)
             if sc != None:
                 searcher.tell_observed_scores(epoch_i, [mdl_i], [sc])
                 num_evals += 1
@@ -520,7 +521,7 @@ class MCTSTreeNode:
 
 # NOTE: if the search space has holes, it break. needs try/except module.
 def run_mcts_searcher(evaluator, searcher, num_models,
-        output_to_terminal=False, ignore_invalid_models=False,
+        ignore_invalid_models=False,
         save_hist_in_model=False):
 
     srch_choice_hists = []
@@ -536,7 +537,7 @@ def run_mcts_searcher(evaluator, searcher, num_models,
 
         # evaluation of the model.
         sc = evaluate_and_print(evaluator, mdl, 
-                output_to_terminal, ignore_invalid_models)
+                 ignore_invalid_models)
         if sc != None:
         #sc = np.random.random() ### come back here.
             searcher.tell_observed_scores([hist], [sc])

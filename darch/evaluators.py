@@ -4,6 +4,9 @@ import numpy as np
 import time
 import os
 import errno
+import logging
+import sys
+
 
 class ClassifierEvaluator:
     """Trains and evaluates a classifier on some datasets passed as argument.
@@ -21,7 +24,7 @@ class ClassifierEvaluator:
             save_patience=2, rate_mult=0.5, batch_mult=2, 
             optimizer_type='adam', sgd_momentum=0.99,
             learning_rate_init=1e-3, learning_rate_min=1e-6, batch_size_init=32, 
-            display_step=1, output_to_terminal=False, test_dataset=None, in_dtype=tf.float32):
+            display_step=1, test_dataset=None, in_dtype=tf.float32, log_file='deep_arch.log'):
 
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
@@ -41,7 +44,6 @@ class ClassifierEvaluator:
         self.learning_rate_min = learning_rate_min
         self.batch_size_init = batch_size_init
         self.optimizer_type = optimizer_type
-        self.output_to_terminal = output_to_terminal
         self.sgd_momentum = sgd_momentum
         self.model_path = model_path
         self.test_dataset = test_dataset
@@ -53,6 +55,9 @@ class ClassifierEvaluator:
             except OSError as exc:  # Guard against race condition
                 if exc.errno != errno.EEXIST:
                     raise
+
+        logging.basicConfig(filename=log_file, level=logging.INFO)
+        logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
     def eval_model(self, b):
         tf.reset_default_graph()
@@ -150,14 +155,14 @@ class ClassifierEvaluator:
                 vacc = compute_accuracy(self.val_dataset, eval_feed, batch_size)
 
                 # Display logs per epoch step
-                if self.output_to_terminal and epoch % self.display_step == 0:
-                    print("Time:", "%7.1f" % (time.time() - time_start),
-                          "Epoch:", '%04d' % (epoch+1),
-                          "cost=", "{:.9f}".format(avg_cost),
-                          "val_acc=", "%.5f" % vacc, 
-                          "learn_rate=", '%.3e' % learning_rate_val)
+                if epoch % self.display_step == 0:
+                    logging.info("Time:", "%7.1f" % (time.time() - time_start),
+                    "Epoch:", '%04d' % (epoch+1),
+                    "cost=", "{:.9f}".format(avg_cost),
+                    "val_acc=", "%.5f" % vacc,
+                    "learn_rate=", '%.3e' % learning_rate_val)
 
-                if best_vacc < vacc: 
+                if best_vacc < vacc:
                     best_vacc = vacc
                     # reinitialize all the counters.
                     stop_counter = self.stop_patience
@@ -187,7 +192,7 @@ class ClassifierEvaluator:
 
                         if save_counter == 0:
                             save_path = saver.save(sess, self.model_path)
-                            print("Model saved in file: %s" % save_path)
+                            logging.info("Model saved in file: %s" % save_path)
 
                             save_counter = self.save_patience
                             best_vacc_saved = vacc
@@ -201,14 +206,15 @@ class ClassifierEvaluator:
             # load it.
             if best_vacc_saved > vacc:
                 saver.restore(sess, self.model_path)
-                print("Model restored from file: %s" % save_path)
+                logging.info("Model restored from file: %s" % save_path)
 
-            print("Optimization Finished!")
+            logging.info("Optimization Finished!")
 
             vacc = compute_accuracy(self.val_dataset, eval_feed, batch_size)
-            print("Validation accuracy: %f" % vacc)
-            if self.test_dataset != None:
+            logging.info("Validation accuracy: %f" % vacc)
+
+            if self.test_dataset is not None:
                 tacc = compute_accuracy(self.test_dataset, eval_feed, batch_size)
-                print("Test accuracy: %f" % tacc)
+                logging.info("Test accuracy: %f" % tacc)
 
         return vacc
