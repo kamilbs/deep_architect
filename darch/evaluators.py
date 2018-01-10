@@ -19,12 +19,12 @@ class ClassifierEvaluator:
     """
 
     def __init__(self, train_dataset, val_dataset, in_d, nclasses, model_path,
-            training_epochs_max=200, time_minutes_max=180.0, 
-            stop_patience=20, rate_patience=7, batch_patience=np.inf, 
-            save_patience=2, rate_mult=0.5, batch_mult=2, 
-            optimizer_type='adam', sgd_momentum=0.99,
-            learning_rate_init=1e-3, learning_rate_min=1e-6, batch_size_init=32, 
-            display_step=1, test_dataset=None, in_dtype=tf.float32, log_file='deep_arch.log'):
+                 training_epochs_max=200, time_minutes_max=180.0,
+                 stop_patience=20, rate_patience=7, batch_patience=np.inf,
+                 save_patience=2, rate_mult=0.5, batch_mult=2,
+                 optimizer_type='adam', sgd_momentum=0.99,
+                 learning_rate_init=1e-3, learning_rate_min=1e-6, batch_size_init=32,
+                 display_step=1, test_dataset=None, in_dtype=tf.float32, log_file='deep_arch.log'):
 
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
@@ -95,6 +95,7 @@ class ClassifierEvaluator:
         # For computing the accuracy of the model
         correct_prediction = tf.equal(tf.argmax(pred, 1), tf.argmax(y, 1))
         num_correct = tf.reduce_sum(tf.cast(correct_prediction, "float"))
+
         def compute_accuracy(dataset, ev_feed, ev_batch_size):
             nc = 0
             n_left = dataset.get_num_examples()
@@ -131,7 +132,6 @@ class ClassifierEvaluator:
             time_start = time.time()
 
             train_num_examples = self.train_dataset.get_num_examples()
-            val_num_examples = self.val_dataset.get_num_examples()
 
             # Training cycle
             for epoch in range(self.training_epochs):
@@ -156,11 +156,14 @@ class ClassifierEvaluator:
 
                 # Display logs per epoch step
                 if epoch % self.display_step == 0:
-                    logging.info("Time:", "%7.1f" % (time.time() - time_start),
-                    "Epoch:", '%04d' % (epoch+1),
-                    "cost=", "{:.9f}".format(avg_cost),
-                    "val_acc=", "%.5f" % vacc,
-                    "learn_rate=", '%.3e' % learning_rate_val)
+                    log_str = ' '.join(str(x) for x in [
+                        "Time:", "%7.1f" % (time.time() - time_start),
+                        "Epoch:", '%04d' % (epoch + 1),
+                        "cost=", "{:.9f}".format(avg_cost),
+                        "val_acc=", "%.5f" % vacc,
+                        "learn_rate=", '%.3e' % learning_rate_val
+                    ])
+                    logging.info(log_str)
 
                 if best_vacc < vacc:
                     best_vacc = vacc

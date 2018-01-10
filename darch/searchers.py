@@ -2,14 +2,14 @@
 import numpy as np
 import scipy.sparse as sp
 import sklearn.linear_model as lm
-from pprint import pprint
 from pprint import pformat
 from darch.base import *
 import copy
 import logging
 
+
 def evaluate_and_print(evaluator, model,
-         ignore_invalid_models):
+                       ignore_invalid_models):
 
     log_str = pformat(model.repr_model() , width=40, indent=2)
     logging.info(log_str)
@@ -26,11 +26,13 @@ def evaluate_and_print(evaluator, model,
     
     return sc
 
+
 # save the history on the model. will be useful for cached evaluation.
-def maybe_register_choice_hist(model, hist, save_hist_in_model):    
+def maybe_register_choice_hist(model, hist, save_hist_in_model):
         if save_hist_in_model:
             assert not hasattr(model, 'choice_hist')
             model.choice_hist = hist
+
 
 def walk_hist(b, hist):
     """Makes a sequence of choices specified by hist towards specifying b.
@@ -48,7 +50,7 @@ class EnumerationSearcher:
 
     def _enumerate_models_iter(self, b, choice_hist):
 
-        if( not b.is_specified() ):
+        if not b.is_specified():
             name, vals = b.get_choices()
 
             # recurse on the enumeration for each of the possible choices.
@@ -69,9 +71,10 @@ class EnumerationSearcher:
         for (bk, choice_histk) in gen_models:
             yield (bk, choice_histk)
 
+
 def run_enumeration_searcher(evaluator, searcher,
          ignore_invalid_models=False,
-        save_hist_in_model=False):
+         save_hist_in_model=False):
 
     scores = []
     hists = []
@@ -84,6 +87,7 @@ def run_enumeration_searcher(evaluator, searcher,
             hists.append(h)
     
     return (scores, hists)
+
 
 class RandomSearcher:
     def __init__(self, b_search, in_d):
@@ -111,11 +115,12 @@ class RandomSearcher:
             samples.append(bk)
             choice_hists.append(hist)
 
-        return (samples, choice_hists)
+        return samples, choice_hists
+
 
 def run_random_searcher(evaluator, searcher, num_models, 
-        ignore_invalid_models=False,
-        save_hist_in_model=False):
+                        ignore_invalid_models=False,
+                        save_hist_in_model=False):
 
     srch_choice_hists = []
     srch_scores = []
@@ -128,13 +133,15 @@ def run_random_searcher(evaluator, searcher, num_models,
         maybe_register_choice_hist(mdl, hist, save_hist_in_model)
 
         sc = evaluate_and_print(evaluator, mdl, 
-                 ignore_invalid_models)
-        if sc != None:
+                                ignore_invalid_models)
+
+        if sc is not None:
             srch_choice_hists.append(hist)
             srch_scores.append(sc)
             mdl_counter += 1
 
-    return (srch_scores, srch_choice_hists)
+    return srch_scores, srch_choice_hists
+
 
 class SMBOLinearSearcher:
     def __init__(self, b_search, in_d, ngram_maxlen, thres, lamb_ridge=1.0e3):
@@ -177,11 +184,11 @@ class SMBOLinearSearcher:
                 filtered_ngrams.append(ngram)
 
         self.module_ngram_to_id = dict(
-            zip(filtered_ngrams, range(len(filtered_ngrams)) ) )
+            zip(filtered_ngrams, range(len(filtered_ngrams))))
 
     def _compute_features(self, model):
 
-        bls = [ b[0] for b in tuple(model.repr_model()) ]
+        bls = [b[0] for b in tuple(model.repr_model())]
 
         nfeats_other = 1
         nfeats_ngrams = len(self.module_ngram_to_id)
@@ -205,7 +212,7 @@ class SMBOLinearSearcher:
         return sp.csr_matrix(feats)
 
     def predict_score(self, model):
-        if self.surr_model == None:
+        if self.surr_model is None:
             return 0.0
 
         feats = self._compute_features(model)
