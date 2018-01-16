@@ -59,12 +59,12 @@ class Embedding(modules.BasicModule):
 
 class RNN(modules.BasicModule):
 
-    def __init__(self, num_units,
+    def __init__(self, num_units, input_keep_prob, output_keep_prob, state_keep_prob,
                  only_last_output=False):
         super(RNN, self).__init__()
 
-        self.order.extend(["num_units"])
-        self.domains.extend([num_units])
+        self.order.extend(["num_units", "input_keep_prob", "output_keep_prob", "state_keep_prob"])
+        self.domains.extend([num_units, input_keep_prob, output_keep_prob, state_keep_prob])
 
         self.only_last_output = only_last_output
 
@@ -88,11 +88,26 @@ class RNN(modules.BasicModule):
 
     def compile(self, in_x, train_feed, eval_feed):
         timesteps = self.in_d[0]
-        num_units_chosen = self.domains[0][self.chosen[0]]
+        num_units_chosen, input_keep_prob_chosen,\
+            output_keep_prob_chosen, state_keep_prob_chosen = [dom[i] for (dom, i) in zip(self.domains, self.chosen)]
+
+        keep_probs_chosen = [input_keep_prob_chosen, output_keep_prob_chosen, state_keep_prob_chosen]
+
+        # placeholder names
+        p_names = [self.namespace_id + '_' + name for name in self.order[1:]]
+
+        placeholder_list = [tf.placeholder(tf.float32, name=n) for n in p_names]
+
+        for placeholder, keep_prob_val in zip(placeholder_list, keep_probs_chosen):
+            train_feed[placeholder] = keep_prob_val
+            eval_feed[placeholder] = 1
 
         unstacked_x = tf.unstack(in_x, timesteps, 1)
 
-        cell = self.get_cell(num_units_chosen)
+        cell = tf.contrib.rnn.DropoutWrapper(self.get_cell(num_units_chosen),
+                                             input_keep_prob=placeholder_list[0],
+                                             output_keep_prob=placeholder_list[1],
+                                             state_keep_prob=placeholder_list[2])
 
         outputs, _ = tf.contrib.rnn.static_rnn(cell, unstacked_x, dtype=tf.float32)
         if self.only_last_output:
@@ -103,12 +118,12 @@ class RNN(modules.BasicModule):
 
 class BiRNN(modules.BasicModule):
 
-    def __init__(self, num_units,
+    def __init__(self, num_units, input_keep_prob, output_keep_prob, state_keep_prob,
                  only_last_output=False):
         super(BiRNN, self).__init__()
 
-        self.order.extend(["num_units"])
-        self.domains.extend([num_units])
+        self.order.extend(["num_units", "input_keep_prob", "output_keep_prob", "state_keep_prob"])
+        self.domains.extend([num_units, input_keep_prob, output_keep_prob, state_keep_prob])
 
         self.only_last_output = only_last_output
 
@@ -132,12 +147,31 @@ class BiRNN(modules.BasicModule):
 
     def compile(self, in_x, train_feed, eval_feed):
         timesteps = self.in_d[0]
-        num_units_chosen = self.domains[0][self.chosen[0]]
+        num_units_chosen, input_keep_prob_chosen,\
+            output_keep_prob_chosen, state_keep_prob_chosen = [dom[i] for (dom, i) in zip(self.domains, self.chosen)]
+
+        keep_probs_chosen = [input_keep_prob_chosen, output_keep_prob_chosen, state_keep_prob_chosen]
+
+        # placeholder names
+        p_names = [self.namespace_id + '_' + name for name in self.order[1:]]
+
+        placeholder_list = [tf.placeholder(tf.float32, name=n) for n in p_names]
+
+        for placeholder, keep_prob_val in zip(placeholder_list, keep_probs_chosen):
+            train_feed[placeholder] = keep_prob_val
+            eval_feed[placeholder] = 1
 
         unstacked_x = tf.unstack(in_x, timesteps, 1)
 
-        forward_cell = self.get_cell(num_units_chosen)
-        backward_cell = self.get_cell(num_units_chosen)
+        forward_cell = tf.contrib.rnn.DropoutWrapper(self.get_cell(num_units_chosen),
+                                                     input_keep_prob=placeholder_list[0],
+                                                     output_keep_prob=placeholder_list[1],
+                                                     state_keep_prob=placeholder_list[2])
+
+        backward_cell = tf.contrib.rnn.DropoutWrapper(self.get_cell(num_units_chosen),
+                                                      input_keep_prob=placeholder_list[0],
+                                                      output_keep_prob=placeholder_list[1],
+                                                      state_keep_prob=placeholder_list[2])
 
         # forward and backward outputs are concatenated
         outputs, _, _ = tf.contrib.rnn.static_bidirectional_rnn(forward_cell, backward_cell,
@@ -149,36 +183,40 @@ class BiRNN(modules.BasicModule):
 
 
 class LSTM(RNN):
-    def __init__(self, num_units,
+    def __init__(self, num_units, input_keep_prob, output_keep_prob, state_keep_prob,
                  only_last_output=False):
-        super(LSTM, self).__init__(num_units, only_last_output=only_last_output)
+        super(LSTM, self).__init__(num_units, input_keep_prob, output_keep_prob, state_keep_prob,
+                                   only_last_output=only_last_output)
 
     def get_cell(self, num_hidden):
         return tf.contrib.rnn.BasicLSTMCell(num_units=num_hidden)
 
 
 class GRU(RNN):
-    def __init__(self, num_units,
+    def __init__(self, num_units, input_keep_prob, output_keep_prob, state_keep_prob,
                  only_last_output=False):
-        super(GRU, self).__init__(num_units, only_last_output=only_last_output)
+        super(GRU, self).__init__(num_units, input_keep_prob, output_keep_prob, state_keep_prob,
+                                  only_last_output=only_last_output)
 
     def get_cell(self, num_hidden):
         return tf.contrib.rnn.GRUCell(num_units=num_hidden)
 
 
 class BiLSTM(BiRNN):
-    def __init__(self, num_units,
+    def __init__(self, num_units, input_keep_prob, output_keep_prob, state_keep_prob,
                  only_last_output=False):
-        super(BiLSTM, self).__init__(num_units, only_last_output=only_last_output)
+        super(BiLSTM, self).__init__(num_units, input_keep_prob, output_keep_prob, state_keep_prob,
+                                     only_last_output=only_last_output)
 
     def get_cell(self, num_hidden):
         return tf.contrib.rnn.BasicLSTMCell(num_units=num_hidden)
 
 
 class BiGRU(BiRNN):
-    def __init__(self, num_units,
+    def __init__(self, num_units,input_keep_prob, output_keep_prob, state_keep_prob,
                  only_last_output=False):
-        super(BiGRU, self).__init__(num_units, only_last_output=only_last_output)
+        super(BiGRU, self).__init__(num_units, input_keep_prob, output_keep_prob, state_keep_prob,
+                                    only_last_output=only_last_output)
 
     def get_cell(self, num_hidden):
         return tf.contrib.rnn.GRUCell(num_units=num_hidden)
