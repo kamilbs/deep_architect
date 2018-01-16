@@ -90,11 +90,58 @@ class RNN(modules.BasicModule):
         timesteps = self.in_d[0]
         num_units_chosen = self.domains[0][self.chosen[0]]
 
-        untacked_x = tf.unstack(in_x, timesteps, 1)
+        unstacked_x = tf.unstack(in_x, timesteps, 1)
 
         cell = self.get_cell(num_units_chosen)
 
-        outputs, _ = tf.contrib.rnn.static_rnn(cell, untacked_x, dtype=tf.float32)
+        outputs, _ = tf.contrib.rnn.static_rnn(cell, unstacked_x, dtype=tf.float32)
+        if self.only_last_output:
+            return outputs[-1]
+        else:
+            return tf.stack(outputs, 1)
+
+
+class BiRNN(modules.BasicModule):
+
+    def __init__(self, num_units,
+                 only_last_output=False):
+        super(BiRNN, self).__init__()
+
+        self.order.extend(["num_units"])
+        self.domains.extend([num_units])
+
+        self.only_last_output = only_last_output
+
+    # Additional error checking on dimension
+    def initialize(self, in_d, scope):
+        if len(in_d) != 2:
+            raise ValueError
+        else:
+            super(BiRNN, self).initialize(in_d, scope)
+
+    def get_cell(self, num_hidden):
+        raise NotImplementedError
+
+    def get_outdim(self):
+        num_units_chosen = self.domains[0][self.chosen[0]]
+        if self.only_last_output:
+            return (num_units_chosen * 2,)
+        else:
+            timesteps = self.in_d[0]
+            return timesteps, num_units_chosen * 2
+
+    def compile(self, in_x, train_feed, eval_feed):
+        timesteps = self.in_d[0]
+        num_units_chosen = self.domains[0][self.chosen[0]]
+
+        unstacked_x = tf.unstack(in_x, timesteps, 1)
+
+        forward_cell = self.get_cell(num_units_chosen)
+        backward_cell = self.get_cell(num_units_chosen)
+
+        # forward and backward outputs are concatenated
+        outputs, _, _ = tf.contrib.rnn.static_bidirectional_rnn(forward_cell, backward_cell,
+                                                                unstacked_x, dtype=tf.float32)
         if self.only_last_output:
             return outputs[-1]
         else:
@@ -110,11 +157,28 @@ class LSTM(RNN):
         return tf.contrib.rnn.BasicLSTMCell(num_units=num_hidden)
 
 
-
 class GRU(RNN):
     def __init__(self, num_units,
                  only_last_output=False):
         super(GRU, self).__init__(num_units, only_last_output=only_last_output)
+
+    def get_cell(self, num_hidden):
+        return tf.contrib.rnn.GRUCell(num_units=num_hidden)
+
+
+class BiLSTM(BiRNN):
+    def __init__(self, num_units,
+                 only_last_output=False):
+        super(BiLSTM, self).__init__(num_units, only_last_output=only_last_output)
+
+    def get_cell(self, num_hidden):
+        return tf.contrib.rnn.BasicLSTMCell(num_units=num_hidden)
+
+
+class BiGRU(BiRNN):
+    def __init__(self, num_units,
+                 only_last_output=False):
+        super(BiGRU, self).__init__(num_units, only_last_output=only_last_output)
 
     def get_cell(self, num_hidden):
         return tf.contrib.rnn.GRUCell(num_units=num_hidden)
