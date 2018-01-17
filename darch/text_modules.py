@@ -222,6 +222,38 @@ class BiGRU(BiRNN):
         return tf.contrib.rnn.GRUCell(num_units=num_hidden)
 
 
+class ClassificationAttention(modules.BasicModule):
+    def __init__(self, param_init_fns):
+        super(ClassificationAttention, self).__init__()
+        self.order.append("param_init_fn")
+        self.domains.append([param_init_fns])
+
+    def initialize(self, in_d, scope):
+        if len(self.in_d) != 2:
+            raise ValueError('Should be 2-dimensional (timesteps,dim)')
+        else:
+            super(ClassificationAttention, self).initialize(in_d, scope)
+
+    def get_out_dim(self):
+        timesteps, dim = self.in_d
+        return (dim, )
+
+    def compile(self, in_x, train_feed, eval_feed):
+        param_init_fn = self.domains[0][self.chosen[0]]
+        timesteps, dim = self.in_d
+
+        W = tf.Variable(param_init_fn([dim, dim]))
+        b = tf.Variable(tf.zeros([dim]))
+        u_s = tf.Variable([dim])
+
+        u = tf.add(tf.tensordot(in_x, W, axes=1), b)
+        u_dot_us = tf.tensordot(u, u_s, axes=1)
+
+        alphas = tf.nn.softmax(u_dot_us)
+
+        return tf.reduce_sum(in_x * tf.expand_dims(alphas, -1), 1)
+
+
 
 
 
