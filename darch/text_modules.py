@@ -237,15 +237,15 @@ class ClassificationAttention(modules.BasicModule):
     def __init__(self, param_init_fns):
         super(ClassificationAttention, self).__init__()
         self.order.append("param_init_fn")
-        self.domains.append([param_init_fns])
+        self.domains.append(param_init_fns)
 
     def initialize(self, in_d, scope):
-        if len(self.in_d) != 2:
+        if len(in_d) != 2:
             raise ValueError('Should be 2-dimensional (timesteps,dim)')
         else:
             super(ClassificationAttention, self).initialize(in_d, scope)
 
-    def get_out_dim(self):
+    def get_outdim(self):
         timesteps, dim = self.in_d
         return (dim, )
 
@@ -255,7 +255,7 @@ class ClassificationAttention(modules.BasicModule):
 
         W = tf.Variable(param_init_fn([dim, dim]))
         b = tf.Variable(tf.zeros([dim]))
-        u_s = tf.Variable([dim])
+        u_s = tf.Variable(tf.random_normal([dim], stddev=0.1))
 
         u = tf.add(tf.tensordot(in_x, W, axes=1), b)
         u_dot_us = tf.tensordot(u, u_s, axes=1)
