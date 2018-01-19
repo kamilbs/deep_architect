@@ -1,7 +1,6 @@
-import numpy as np
 import tensorflow as tf
 import darch.modules as modules
-
+import warnings
 
 class Embedding(modules.BasicModule):
 
@@ -70,7 +69,10 @@ class RNN(modules.BasicModule):
 
     # Additional error checking on dimension
     def initialize(self, in_d, scope):
-        if len(in_d) != 2:
+        if len(in_d) == 3 and in_d[1] == 1:
+            warnings.warn('Please check that is indeed a CNN output as input (--getting rid of one dimension--)')
+            super(RNN, self).initialize(in_d, scope)
+        elif len(in_d) != 2:
             raise ValueError
         else:
             super(RNN, self).initialize(in_d, scope)
@@ -102,6 +104,9 @@ class RNN(modules.BasicModule):
             train_feed[placeholder] = keep_prob_val
             eval_feed[placeholder] = 1
 
+        if len(self.in_d) == 3:
+            in_x = tf.squeeze(in_x, axis=[2])
+
         unstacked_x = tf.unstack(in_x, timesteps, 1)
 
         cell = tf.contrib.rnn.DropoutWrapper(self.get_cell(num_units_chosen),
@@ -129,7 +134,10 @@ class BiRNN(modules.BasicModule):
 
     # Additional error checking on dimension
     def initialize(self, in_d, scope):
-        if len(in_d) != 2:
+        if len(in_d) == 3 and in_d[1] == 1:
+            warnings.warn('Please check that is indeed a CNN output as input (--getting rid of one dimension--)')
+            super(BiRNN, self).initialize(in_d, scope)
+        elif len(in_d != 2):
             raise ValueError
         else:
             super(BiRNN, self).initialize(in_d, scope)
@@ -160,6 +168,9 @@ class BiRNN(modules.BasicModule):
         for placeholder, keep_prob_val in zip(placeholder_list, keep_probs_chosen):
             train_feed[placeholder] = keep_prob_val
             eval_feed[placeholder] = 1
+
+        if len(self.in_d) == 3:
+            in_x = tf.squeeze(in_x, axis=[2])
 
         unstacked_x = tf.unstack(in_x, timesteps, 1)
 
