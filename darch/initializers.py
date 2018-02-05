@@ -30,6 +30,18 @@ def xavier_initializer_affine(gain=1.0):
         return init_vals
     return init_fn
 
+
+def xavier_initializer_conv(gain=1.0):
+    def init_fn(shape):
+        fan_in = np.prod(shape[1:])
+        fan_out = shape[0]
+
+        sc = gain * (np.sqrt(6.0) / np.sqrt(fan_in + fan_out))
+        init_vals = tf.random_uniform(shape, -sc, sc)
+        return init_vals
+
+    return init_fn
+
 def kaiming2015delving_initializer_conv(gain=1.0):
     """Initializer proposed in the paper "Delving Deep into Rectifiers" 
     for initializing conv layers with RELU nonlinearities. 
