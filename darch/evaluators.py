@@ -24,7 +24,7 @@ class ClassifierEvaluator:
                  save_patience=2, rate_mult=0.5, batch_mult=2,
                  optimizer_type='adam', sgd_momentum=0.99,
                  learning_rate_init=1e-3, learning_rate_min=1e-6, batch_size_init=32,
-                 display_step=1, test_dataset=None, in_dtype=tf.float32, log_file='deep_arch.log'):
+                 display_step=1, test_dataset=None, in_dtype=tf.float32, log_file='deep_arch.log', tensorboard_dir='tb_logs'):
 
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
@@ -48,6 +48,7 @@ class ClassifierEvaluator:
         self.model_path = model_path
         self.test_dataset = test_dataset
         self.in_dtype = in_dtype
+        self.tensorboard_dir = tensorboard_dir
         
         if not os.path.exists(os.path.dirname(model_path)):
             try:
@@ -59,7 +60,7 @@ class ClassifierEvaluator:
         logging.basicConfig(filename=log_file, level=logging.INFO)
         logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
-    def eval_model(self, b):
+    def eval_model(self, b, model_nb):
         tf.reset_default_graph()
 
         x = tf.placeholder(shape=[None] + self.in_d, dtype=self.in_dtype)
@@ -77,8 +78,9 @@ class ClassifierEvaluator:
         saver = tf.train.Saver()
 
         # Define loss and optimizer
-        cost = tf.reduce_mean(
-            tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=y))
+        with tf.name_scope('softmax_cross_entropy'):
+            cost = tf.reduce_mean(
+                tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=y))
         # chooses the optimizer. (this can be put in a function).
         if self.optimizer_type == 'adam':
             optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
@@ -109,7 +111,16 @@ class ClassifierEvaluator:
                 n_left -= eff_batch_size
             
             acc = float(nc) / dataset.get_num_examples()
-            return acc 
+            return acc
+
+
+        tracc_placeholder = tf.placeholder(tf.float32, shape=())
+        vacc_placeholder = tf.placeholder(tf.float32, shape=())
+        tr_accuracy_summary_full = tf.summary.scalar('train_accuracy_full', tracc_placeholder)
+        val_accuracy_summary_full = tf.summary.scalar('val_accuracy_full', vacc_placeholder)
+
+        tb_folder_for_run = os.path.join(self.tensorboard_dir, 'model_'+str(model_nb))
+        train_writer = tf.summary.FileWriter(tb_folder_for_run)
 
         # Initializing the variables
         init = tf.global_variables_initializer()
@@ -120,8 +131,9 @@ class ClassifierEvaluator:
                 #    allow_soft_placement=True
                 #)
             ) as sess:
-            sess.run(init)
+            train_writer.add_graph(sess.graph)
 
+            sess.run(init)
             # for early stopping
             best_vacc = - np.inf
             best_vacc_saved = - np.inf
@@ -153,6 +165,13 @@ class ClassifierEvaluator:
 
                 # early stopping
                 vacc = compute_accuracy(self.val_dataset, eval_feed, batch_size)
+                summary = sess.run(val_accuracy_summary_full, feed_dict={vacc_placeholder: vacc})
+                train_writer.add_summary(summary, epoch)
+
+                if epoch % 5 == 0:
+                    tracc = compute_accuracy(self.train_dataset, train_feed, batch_size)
+                    summary = sess.run(tr_accuracy_summary_full, feed_dict={tracc_placeholder: tracc})
+                    train_writer.add_summary(summary, epoch)
 
                 # Display logs per epoch step
                 if epoch % self.display_step == 0:
@@ -160,6 +179,7 @@ class ClassifierEvaluator:
                         "Time:", "%7.1f" % (time.time() - time_start),
                         "Epoch:", '%04d' % (epoch + 1),
                         "cost=", "{:.9f}".format(avg_cost),
+                        "train_acc=", "%.5f" % tracc,
                         "val_acc=", "%.5f" % vacc,
                         "learn_rate=", '%.3e' % learning_rate_val
                     ])

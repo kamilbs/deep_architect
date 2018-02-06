@@ -8,7 +8,7 @@ import copy
 import logging
 
 
-def evaluate_and_print(evaluator, model,
+def evaluate_and_print(evaluator, model, model_nb,
                        ignore_invalid_models):
 
     log_str = pformat(model.repr_model() , width=40, indent=2)
@@ -16,13 +16,13 @@ def evaluate_and_print(evaluator, model,
         
     if ignore_invalid_models:
         try: 
-            sc = evaluator.eval_model(model)
+            sc = evaluator.eval_model(model, model_nb)
 
         except ValueError:
                 logging.info("Invalid Model!")
                 return None
     else:
-        sc = evaluator.eval_model(model)   
+        sc = evaluator.eval_model(model, model_nb)
     
     return sc
 
@@ -78,10 +78,12 @@ def run_enumeration_searcher(evaluator, searcher,
 
     scores = []
     hists = []
+    model_nb = 0
     for (mdl, h) in searcher.enumerate_models():
 
-        sc = evaluate_and_print(evaluator, mdl,
+        sc = evaluate_and_print(evaluator, mdl, model_nb,
                  ignore_invalid_models)
+        model_nb += 1
         if sc != None:
             scores.append(sc)
             hists.append(h)
@@ -132,7 +134,7 @@ def run_random_searcher(evaluator, searcher, num_models,
         hist = tuple(hists[0])
         maybe_register_choice_hist(mdl, hist, save_hist_in_model)
 
-        sc = evaluate_and_print(evaluator, mdl, 
+        sc = evaluate_and_print(evaluator, mdl, mdl_counter,
                                 ignore_invalid_models)
 
         if sc is not None:
@@ -341,7 +343,7 @@ def run_smbo_searcher(evaluator, searcher,
         maybe_register_choice_hist(mdl, hist, save_hist_in_model)
 
         #sc = evaluator.eval_model(mdl)
-        sc = evaluate_and_print(evaluator, mdl, 
+        sc = evaluate_and_print(evaluator, mdl, num_evals,
                  ignore_invalid_models)
         if sc != None:
             ep_model_inds.append(i)
@@ -374,7 +376,7 @@ def run_smbo_searcher(evaluator, searcher,
             maybe_register_choice_hist(mdl, hist, save_hist_in_model)
 
             #sc = evaluator.eval_model(mdl)
-            sc = evaluate_and_print(evaluator, mdl, 
+            sc = evaluate_and_print(evaluator, mdl, num_evals,
                      ignore_invalid_models)
             if sc != None:
                 searcher.tell_observed_scores(epoch_i, [mdl_i], [sc])
@@ -534,7 +536,7 @@ def run_mcts_searcher(evaluator, searcher, num_models,
     srch_choice_hists = []
     srch_scores = []
 
-    for _ in range(num_models):
+    for i in range(num_models):
         (models, hists) = searcher.sample_models(1)
         mdl = models[0]
         # has to join the tree and rollout histories to make a normal history.
@@ -543,7 +545,7 @@ def run_mcts_searcher(evaluator, searcher, num_models,
         maybe_register_choice_hist(mdl, cache_hist, save_hist_in_model)
 
         # evaluation of the model.
-        sc = evaluate_and_print(evaluator, mdl, 
+        sc = evaluate_and_print(evaluator, mdl, i,
                  ignore_invalid_models)
         if sc != None:
         #sc = np.random.random() ### come back here.
