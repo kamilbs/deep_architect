@@ -1,6 +1,7 @@
 import tensorflow as tf
 import darch.modules as modules
 import warnings
+import numpy as np
 
 class Embedding(modules.BasicModule):
 
@@ -255,9 +256,12 @@ class ClassificationAttention(modules.BasicModule):
 
         W = tf.Variable(param_init_fn([dim, dim]))
         b = tf.Variable(tf.zeros([dim]))
-        u_s = tf.Variable(tf.random_normal([dim], stddev=0.1))
+
+        sc = np.sqrt(6.0)/np.sqrt(dim + 1)
+        u_s = tf.Variable(tf.random_uniform([dim], -sc, sc))
 
         u = tf.add(tf.tensordot(in_x, W, axes=1), b)
+        u = tf.tanh(u)
         u_dot_us = tf.tensordot(u, u_s, axes=1)
 
         alphas = tf.nn.softmax(u_dot_us)
