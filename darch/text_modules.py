@@ -43,17 +43,17 @@ class Embedding(modules.BasicModule):
 
     def compile(self, in_x, train_feed, eval_feed):
         trainable, emb_dimension, param_init_fn = [dom[i] for (dom, i) in zip(self.domains, self.chosen)]
-        W = tf.Variable(param_init_fn([self.vocabulary_size, emb_dimension]), trainable=trainable)
-        if self.using_pretrained:
-            W = W.assign(self.pretrained_array)
-            with tf.Session() as sess:
-                sess.run(tf.assign(W, self.pretrained_array))
+        with tf.device('/cpu:0'):
+            W = tf.Variable(param_init_fn([self.vocabulary_size, emb_dimension]), trainable=trainable)
+            if self.using_pretrained:
+                W = W.assign(self.pretrained_array)
+                with tf.Session() as sess:
+                    sess.run(tf.assign(W, self.pretrained_array))
 
-        embedded_tokens = tf.nn.embedding_lookup(W, in_x)
-        if self.expand_one_dim:
-            embedded_tokens = tf.expand_dims(embedded_tokens, -1)
-
-        return embedded_tokens
+            embedded_tokens = tf.nn.embedding_lookup(W, in_x)
+            if self.expand_one_dim:
+                embedded_tokens = tf.expand_dims(embedded_tokens, -1)
+            return embedded_tokens
 
 
 
