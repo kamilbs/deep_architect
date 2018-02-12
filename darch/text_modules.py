@@ -241,7 +241,10 @@ class ClassificationAttention(modules.BasicModule):
         self.domains.append(param_init_fns)
 
     def initialize(self, in_d, scope):
-        if len(in_d) != 2:
+        if len(in_d) == 3 and in_d[1] == 1:
+            warnings.warn('Please check that is indeed a CNN output as input (--getting rid of one dimension--)')
+            super(ClassificationAttention, self).initialize(in_d, scope)
+        elif len(in_d) != 2:
             raise ValueError('Should be 2-dimensional (timesteps,dim)')
         else:
             super(ClassificationAttention, self).initialize(in_d, scope)
