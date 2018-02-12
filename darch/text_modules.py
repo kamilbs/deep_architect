@@ -138,7 +138,7 @@ class BiRNN(modules.BasicModule):
         if len(in_d) == 3 and in_d[1] == 1:
             warnings.warn('Please check that is indeed a CNN output as input (--getting rid of one dimension--)')
             super(BiRNN, self).initialize(in_d, scope)
-        elif len(in_d != 2):
+        elif len(in_d) != 2:
             raise ValueError
         else:
             super(BiRNN, self).initialize(in_d, scope)
@@ -250,12 +250,19 @@ class ClassificationAttention(modules.BasicModule):
             super(ClassificationAttention, self).initialize(in_d, scope)
 
     def get_outdim(self):
-        timesteps, dim = self.in_d
+        if len(self.in_d) == 3:
+            dim = self.in_d[2]
+        else:
+            dim = self.in_d[1]
         return (dim, )
 
     def compile(self, in_x, train_feed, eval_feed):
         param_init_fn = self.domains[0][self.chosen[0]]
-        timesteps, dim = self.in_d
+        if len(self.in_d) == 2:
+            timesteps, dim = self.in_d
+        else:
+            in_x = tf.squeeze(in_x, axis=[2])
+            timesteps, _ , dim = self.in_d
 
         W = tf.Variable(param_init_fn([dim, dim]))
         b = tf.Variable(tf.zeros([dim]))
