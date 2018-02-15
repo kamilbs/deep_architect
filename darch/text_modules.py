@@ -8,7 +8,7 @@ class Embedding(modules.BasicModule):
     def __init__(self, trainable, emb_dimension, param_init_fns, vocabulary_size, pretrained_array=None, expand_one_dim=False):
         super(Embedding, self).__init__()
         self.order.extend(["trainable", "emb_dimension", "param_init_fn"])
-        self.domains.extend([trainable, emb_dimension ,param_init_fns])
+        self.domains.extend([trainable, emb_dimension, param_init_fns])
 
         self.using_pretrained = False
 
@@ -56,6 +56,32 @@ class Embedding(modules.BasicModule):
             return embedded_tokens
 
 
+class EmbeddingDropout(modules.BasicModule):
+
+    def __init__(self, ps):
+        super(EmbeddingDropout, self).__init__()
+        self.order.append("keep_prob")
+        self.domains.append(ps)
+
+    def get_outdim(self):
+        return self.in_d
+
+    def compile(self, in_x, train_feed, eval_feed):
+        p_name = self.namespace_id + '_' + self.order[0]
+        p_var = tf.placeholder(tf.float32, name=p_name)
+
+        # during training the value of the dropout probability (keep_prob) is
+        # set to the actual chosen value.
+        # during evalution, it is set to 1.0.
+        p_val = self.domains[0][self.chosen[0]]
+        train_feed[p_var] = p_val
+        eval_feed[p_var] = 1.0
+        if len(self.in_d) == 2:
+            out_y = tf.nn.dropout(in_x, p_var, noise_shape=[self.in_d[0], 1])
+        elif len(self.in_d) == 3:
+            out_y = tf.nn.dropout(in_x, p_var, noise_shape=[self.in_d[0], 1, 1])
+
+        return out_y
 
 class RNN(modules.BasicModule):
 
