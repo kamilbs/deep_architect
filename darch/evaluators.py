@@ -61,6 +61,18 @@ class ClassifierEvaluator:
         logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
     def eval_model(self, b, model_nb):
+
+        dir_checkpoint_for_model = os.path.join(self.model_path, 'model_'+str(model_nb))
+        if not os.path.exists(os.path.dirname(dir_checkpoint_for_model)):
+            try:
+                print('Creating dir for ', 'model_'+str(model_nb))
+                os.makedirs(dir_checkpoint_for_model)
+            except OSError as exc:  # Guard against race condition
+                if exc.errno != errno.EEXIST:
+                    raise
+
+
+
         tf.reset_default_graph()
 
         x = tf.placeholder(shape=[None] + self.in_d, dtype=self.in_dtype)
@@ -214,7 +226,7 @@ class ClassifierEvaluator:
                         save_counter -= 1
 
                         if save_counter == 0:
-                            save_path = saver.save(sess, self.model_path)
+                            save_path = saver.save(sess, os.path.join(dir_checkpoint_for_model, 'model.ckpt'))
                             logging.info("Model saved in file: %s" % save_path)
 
                             save_counter = self.save_patience
@@ -228,7 +240,7 @@ class ClassifierEvaluator:
             # if the model saved has better performance than the current model,
             # load it.
             if best_vacc_saved > vacc:
-                saver.restore(sess, self.model_path)
+                saver.restore(sess, save_path)
                 logging.info("Model restored from file: %s" % save_path)
 
             logging.info("Optimization Finished!")
