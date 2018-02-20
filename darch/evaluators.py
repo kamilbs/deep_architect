@@ -6,7 +6,8 @@ import os
 import errno
 import logging
 import sys
-
+from darch.datasets import onehot_to_idx
+from sklearn.metrics import f1_score
 
 class ClassifierEvaluator:
     """Trains and evaluates a classifier on some datasets passed as argument.
@@ -24,7 +25,8 @@ class ClassifierEvaluator:
                  save_patience=2, rate_mult=0.5, batch_mult=2,
                  optimizer_type='adam', sgd_momentum=0.99,
                  learning_rate_init=1e-3, learning_rate_min=1e-6, batch_size_init=32,
-                 display_step=1, test_dataset=None, in_dtype=tf.float32, log_file='deep_arch.log', tensorboard_dir='tb_logs'):
+                 display_step=1, test_dataset=None, in_dtype=tf.float32, log_file='deep_arch.log', tensorboard_dir='tb_logs',
+                 evaluation='accuracy'):
 
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
@@ -49,6 +51,7 @@ class ClassifierEvaluator:
         self.test_dataset = test_dataset
         self.in_dtype = in_dtype
         self.tensorboard_dir = tensorboard_dir
+        self.evaluation = evaluation
         
         if not os.path.exists(os.path.dirname(model_path)):
             try:
@@ -125,11 +128,37 @@ class ClassifierEvaluator:
             acc = float(nc) / dataset.get_num_examples()
             return acc
 
+        def compute_fscore(dataset, ev_feed, ev_batch_size):
+            n_left = dataset.get_num_examples()
 
-        tracc_placeholder = tf.placeholder(tf.float32, shape=())
-        vacc_placeholder = tf.placeholder(tf.float32, shape=())
-        tr_accuracy_summary_full = tf.summary.scalar('train_accuracy_full', tracc_placeholder)
-        val_accuracy_summary_full = tf.summary.scalar('val_accuracy_full', vacc_placeholder)
+            true_label = np.zeros(n_left)
+            predicted_label = np.zeros(n_left)
+            idx = 0
+
+            while n_left > 0:
+                images, labels = dataset.next_batch(ev_batch_size)
+                eff_batch_size = labels.shape[0]
+                true_label[idx:idx+eff_batch_size] = onehot_to_idx(labels)
+                ev_feed.update({x: images,
+                                y: labels})
+                predictions = tf.argmax(pred, 1).eval(ev_feed)
+                predicted_label[idx:idx + eff_batch_size] = predictions
+                # update the number of examples left.
+                idx += eff_batch_size
+                n_left -= eff_batch_size
+
+            return f1_score(true_label, predicted_label, average=self.evaluation)
+
+
+        if self.evaluation == 'accuracy':
+            evaluation_fn = compute_accuracy
+        else:
+            evaluation_fn = compute_fscore
+
+        average_cost_placeholder = tf.placeholder(tf.float32, shape=())
+        valeval_placeholder = tf.placeholder(tf.float32, shape=())
+        tr_cost_summary_average = tf.summary.scalar('cost_average'.format(eval=self.evaluation), average_cost_placeholder)
+        val_eval_summary_full = tf.summary.scalar('val_{eval}_full'.format(eval=self.evaluation), valeval_placeholder)
 
         tb_folder_for_run = os.path.join(self.tensorboard_dir, 'model_'+str(model_nb))
         train_writer = tf.summary.FileWriter(tb_folder_for_run)
@@ -176,14 +205,13 @@ class ClassifierEvaluator:
                     avg_cost += c / total_batch
 
                 # early stopping
-                vacc = compute_accuracy(self.val_dataset, eval_feed, batch_size)
-                summary = sess.run(val_accuracy_summary_full, feed_dict={vacc_placeholder: vacc})
+                vacc = evaluation_fn(self.val_dataset, eval_feed, 1024)
+                summary = sess.run(val_eval_summary_full, feed_dict={valeval_placeholder: vacc})
                 train_writer.add_summary(summary, epoch)
 
-                if epoch % 5 == 0:
-                    tracc = compute_accuracy(self.train_dataset, train_feed, batch_size)
-                    summary = sess.run(tr_accuracy_summary_full, feed_dict={tracc_placeholder: tracc})
-                    train_writer.add_summary(summary, epoch)
+                summary = sess.run(tr_cost_summary_average, feed_dict={average_cost_placeholder: avg_cost})
+                train_writer.add_summary(summary, epoch)
+
 
                 # Display logs per epoch step
                 if epoch % self.display_step == 0:
@@ -191,7 +219,6 @@ class ClassifierEvaluator:
                         "Time:", "%7.1f" % (time.time() - time_start),
                         "Epoch:", '%04d' % (epoch + 1),
                         "cost=", "{:.9f}".format(avg_cost),
-                        "train_acc=", "%.5f" % tracc,
                         "val_acc=", "%.5f" % vacc,
                         "learn_rate=", '%.3e' % learning_rate_val
                     ])
@@ -245,11 +272,11 @@ class ClassifierEvaluator:
 
             logging.info("Optimization Finished!")
 
-            vacc = compute_accuracy(self.val_dataset, eval_feed, batch_size)
-            logging.info("Validation accuracy: %f" % vacc)
+            vacc = evaluation_fn(self.val_dataset, eval_feed, 1024)
+            logging.info("Validation {eval}: {measure}".format(eval=self.evaluation, measure=vacc))
 
             if self.test_dataset is not None:
-                tacc = compute_accuracy(self.test_dataset, eval_feed, batch_size)
-                logging.info("Test accuracy: %f" % tacc)
+                tacc = evaluation_fn(self.test_dataset, eval_feed, 1024)
+                logging.info("Test {eval}: {measure}".format(eval=self.evaluation, measure=tacc))
 
         return vacc
