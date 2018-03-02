@@ -113,6 +113,8 @@ class ClassifierEvaluator:
         correct_prediction = tf.equal(tf.argmax(pred, 1), tf.argmax(y, 1))
         num_correct = tf.reduce_sum(tf.cast(correct_prediction, "float"))
 
+        max_pred = tf.argmax(pred, 1)
+
         def compute_accuracy(dataset, ev_feed, ev_batch_size):
             nc = 0
             n_left = dataset.get_num_examples()
@@ -141,7 +143,7 @@ class ClassifierEvaluator:
                 true_label[idx:idx+eff_batch_size] = onehot_to_idx(labels)
                 ev_feed.update({x: images,
                                 y: labels})
-                predictions = tf.argmax(pred, 1).eval(ev_feed)
+                predictions = max_pred.eval(ev_feed)
                 predicted_label[idx:idx + eff_batch_size] = predictions
                 # update the number of examples left.
                 idx += eff_batch_size
