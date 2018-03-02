@@ -264,6 +264,7 @@ class ClassifierEvaluator:
                 if (time_now - time_start) / 60.0 > self.time_minutes_max:
                     break
 
+            train_writer.close()
             # if the model saved has better performance than the current model,
             # load it.
             if best_vacc_saved > vacc:
