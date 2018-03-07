@@ -3,6 +3,9 @@ import darch.modules as modules
 import warnings
 import numpy as np
 
+
+
+
 class Embedding(modules.BasicModule):
 
     def __init__(self, trainable, emb_dimension, param_init_fns, vocabulary_size, pretrained_array=None, expand_one_dim=False):
@@ -83,6 +86,17 @@ class EmbeddingDropout(modules.BasicModule):
 
         return out_y
 
+def length(sequence):
+    """
+    Assume 0 padding
+    :param sequence: placeholder : batch_size x max_length x features
+    :return:
+    """
+    used = tf.sign(tf.reduce_max(tf.abs(sequence), 2))
+    length = tf.reduce_sum(used, 1)
+    length = tf.cast(length, tf.int32)
+    return length
+
 class RNN(modules.BasicModule):
 
     def __init__(self, num_units, input_keep_prob, output_keep_prob, state_keep_prob,
@@ -141,7 +155,7 @@ class RNN(modules.BasicModule):
                                              output_keep_prob=placeholder_list[1],
                                              state_keep_prob=placeholder_list[2])
 
-        outputs, _ = tf.contrib.rnn.static_rnn(cell, unstacked_x, dtype=tf.float32)
+        outputs, _ = tf.nn.dynamic_rnn(cell, unstacked_x, sequence_length=length(unstacked_x), dtype=tf.float32)
         if self.only_last_output:
             return outputs[-1]
         else:
@@ -212,8 +226,9 @@ class BiRNN(modules.BasicModule):
                                                       state_keep_prob=placeholder_list[2])
 
         # forward and backward outputs are concatenated
-        outputs, _, _ = tf.contrib.rnn.static_bidirectional_rnn(forward_cell, backward_cell,
-                                                                unstacked_x, dtype=tf.float32)
+        outputs, _, _ = tf.nn.bidirectional_dynamic_rnn(forward_cell, backward_cell,
+                                                        unstacked_x, sequence_length=length(unstacked_x),
+                                                        dtype=tf.float32)
         if self.only_last_output:
             return outputs[-1]
         else:
