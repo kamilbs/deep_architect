@@ -121,6 +121,9 @@ class RNN(modules.BasicModule):
     def get_cell(self, num_hidden):
         raise NotImplementedError
 
+    def cell_type(self):
+        raise NotImplementedError
+
     def get_outdim(self):
         num_units_chosen = self.domains[0][self.chosen[0]]
         if self.only_last_output:
@@ -148,18 +151,20 @@ class RNN(modules.BasicModule):
         if len(self.in_d) == 3:
             in_x = tf.squeeze(in_x, axis=[2])
 
-        unstacked_x = tf.unstack(in_x, timesteps, 1)
 
         cell = tf.contrib.rnn.DropoutWrapper(self.get_cell(num_units_chosen),
                                              input_keep_prob=placeholder_list[0],
                                              output_keep_prob=placeholder_list[1],
                                              state_keep_prob=placeholder_list[2])
 
-        outputs, _ = tf.nn.dynamic_rnn(cell, unstacked_x, sequence_length=length(unstacked_x), dtype=tf.float32)
+        outputs, outputs_state = tf.nn.dynamic_rnn(cell, in_x, sequence_length=length(in_x), dtype=tf.float32)
         if self.only_last_output:
-            return outputs[-1]
+            if self.cell_type() == 'LSTM':
+                return outputs_state.h
+            elif self.cell_type() == 'GRU':
+                return outputs_state
         else:
-            return tf.stack(outputs, 1)
+            return outputs
 
 
 class BiRNN(modules.BasicModule):
@@ -184,6 +189,9 @@ class BiRNN(modules.BasicModule):
             super(BiRNN, self).initialize(in_d, scope)
 
     def get_cell(self, num_hidden):
+        raise NotImplementedError
+
+    def cell_type(self):
         raise NotImplementedError
 
     def get_outdim(self):
@@ -213,8 +221,6 @@ class BiRNN(modules.BasicModule):
         if len(self.in_d) == 3:
             in_x = tf.squeeze(in_x, axis=[2])
 
-        unstacked_x = tf.unstack(in_x, timesteps, 1)
-
         forward_cell = tf.contrib.rnn.DropoutWrapper(self.get_cell(num_units_chosen),
                                                      input_keep_prob=placeholder_list[0],
                                                      output_keep_prob=placeholder_list[1],
@@ -226,13 +232,17 @@ class BiRNN(modules.BasicModule):
                                                       state_keep_prob=placeholder_list[2])
 
         # forward and backward outputs are concatenated
-        outputs, _, _ = tf.nn.bidirectional_dynamic_rnn(forward_cell, backward_cell,
-                                                        unstacked_x, sequence_length=length(unstacked_x),
+        outputs, output_states = tf.nn.bidirectional_dynamic_rnn(forward_cell, backward_cell,
+                                                        in_x, sequence_length=length(in_x),
                                                         dtype=tf.float32)
         if self.only_last_output:
-            return outputs[-1]
+            last_state_fw, last_state_bw = output_states
+            if self.cell_type() == 'LSTM':
+                return tf.concat((last_state_fw.h, last_state_bw.h), axis=1)
+            elif self.cell_type() == 'GRU':
+                return tf.concat((last_state_fw, last_state_bw), axis=1)
         else:
-            return tf.stack(outputs, 1)
+            return tf.concat(outputs, axis=2)
 
 
 class LSTM(RNN):
@@ -244,6 +254,9 @@ class LSTM(RNN):
     def get_cell(self, num_hidden):
         return tf.contrib.rnn.BasicLSTMCell(num_units=num_hidden)
 
+    def cell_type(self):
+        return 'LSTM'
+
 
 class GRU(RNN):
     def __init__(self, num_units, input_keep_prob, output_keep_prob, state_keep_prob,
@@ -253,6 +266,11 @@ class GRU(RNN):
 
     def get_cell(self, num_hidden):
         return tf.contrib.rnn.GRUCell(num_units=num_hidden)
+
+    def cell_type(self):
+        return 'GRU'
+
+
 
 
 class BiLSTM(BiRNN):
@@ -264,6 +282,9 @@ class BiLSTM(BiRNN):
     def get_cell(self, num_hidden):
         return tf.contrib.rnn.BasicLSTMCell(num_units=num_hidden)
 
+    def cell_type(self):
+        return 'LSTM'
+
 
 class BiGRU(BiRNN):
     def __init__(self, num_units,input_keep_prob, output_keep_prob, state_keep_prob,
@@ -273,6 +294,9 @@ class BiGRU(BiRNN):
 
     def get_cell(self, num_hidden):
         return tf.contrib.rnn.GRUCell(num_units=num_hidden)
+
+    def cell_type(self):
+        return 'GRU'
 
 
 class ClassificationAttention(modules.BasicModule):
